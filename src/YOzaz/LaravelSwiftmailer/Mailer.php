@@ -197,6 +197,44 @@ class Mailer {
 		}
 	}
 
+    /**
+     * Stop Swift Mailer SMTP transport adapter
+     *
+     * @return void
+     */
+    protected function stopSwiftTransport()
+    {
+        if ( $this->mailer && method_exists( $this->mailer, 'isPretending' ) && $this->mailer->isPretending() )
+        {
+            return;
+        }
+
+        if ( ! $transport = $this->getSwiftMailerTransport())
+        {
+            return;
+        }
+
+        if ( ! is_a( $transport, '\Swift_Transport_AbstractSmtpTransport' ) )
+        {
+            return;
+        }
+
+        if ( ! $transport->isStarted() )
+        {
+            return;
+        }
+
+        try
+        {
+            // Stop the SMTP connection, avoid broken pipes
+            $transport->stop();
+        }
+        catch (Exception $e)
+        {
+            // Do nothing
+        }
+    }
+
 	/**
 	 * Manual reset for SMTP adapter
 	 *
@@ -369,6 +407,13 @@ class Mailer {
 			$this->resetSwiftTransport();
 		}
 
-		return call_user_func_array( [$this->mailer, $method], $args );
+		$return = call_user_func_array( [$this->mailer, $method], $args );
+
+        if ( $this->autoResetEnabled() && in_array($method, $intercepted_methods) )
+        {
+            $this->stopSwiftTransport();
+        }
+
+        return $return;
 	}
 }
